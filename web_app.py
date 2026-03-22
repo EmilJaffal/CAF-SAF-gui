@@ -2,6 +2,7 @@ import builtins
 import contextlib
 import io
 import importlib.util
+import importlib
 import os
 import shutil
 import subprocess
@@ -957,19 +958,42 @@ def _load_saf_main_module():
 
 
 def _run_saf_with_installed_packages(job_dir: Path):
-    try:
-        from cifkit import Cif
-        from cifkit.utils.folder import get_file_paths
-        from pandas import DataFrame
-        from SAF.features.generator import (
-            compute_binary_features,
-            compute_quaternary_features,
-            compute_ternary_features,
+    def _load_saf_generators():
+        import_errors = []
+        module_candidates = [
+            "SAF.features.generator",
+            "saf.features.generator",
+            "composition_analyzer_featurizer.SAF.features.generator",
+            "composition_analyzer_featurizer.saf.features.generator",
+        ]
+
+        for module_name in module_candidates:
+            try:
+                module = importlib.import_module(module_name)
+                binary = getattr(module, "compute_binary_features")
+                ternary = getattr(module, "compute_ternary_features")
+                quaternary = getattr(module, "compute_quaternary_features")
+                return binary, ternary, quaternary
+            except Exception as exc:
+                import_errors.append(f"{module_name}: {exc}")
+
+        raise RuntimeError(
+            "Could not import SAF feature generators from installed packages. "
+            "Tried modules:\n- "
+            + "\n- ".join(import_errors)
         )
+
+    try:
+        from pandas import DataFrame
+        (
+            compute_binary_features,
+            compute_ternary_features,
+            compute_quaternary_features,
+        ) = _load_saf_generators()
     except Exception as exc:
         raise RuntimeError(
-            "SAF fallback runner requires installed packages: cifkit and "
-            "composition-analyzer-featurizer (SAF module)."
+            "SAF fallback runner could not initialize from installed "
+            "composition-analyzer-featurizer package."
         ) from exc
 
     cif_dirs = _find_cif_dirs(job_dir)
@@ -977,31 +1001,41 @@ def _run_saf_with_installed_packages(job_dir: Path):
         raise RuntimeError("No .cif files found. Upload a ZIP containing CIF files.")
 
     for cif_dir in cif_dirs:
-        file_paths = get_file_paths(str(cif_dir))
+        file_paths = sorted(cif_dir.rglob("*.cif"))
         binary_data = []
         ternary_data = []
         quaternary_data = []
         universal_data = []
 
         for file_path in file_paths:
+            file_path_str = str(file_path)
+            matched = False
             try:
-                cif = Cif(file_path)
+                features, uni_features = compute_binary_features(file_path_str)
+                binary_data.append(features)
+                universal_data.append(uni_features)
+                matched = True
             except Exception:
+                pass
+
+            if matched:
                 continue
 
             try:
-                if len(cif.unique_elements) == 2:
-                    features, uni_features = compute_binary_features(file_path)
-                    binary_data.append(features)
-                    universal_data.append(uni_features)
-                elif len(cif.unique_elements) == 3:
-                    features, uni_features = compute_ternary_features(file_path)
-                    ternary_data.append(features)
-                    universal_data.append(uni_features)
-                elif len(cif.unique_elements) == 4:
-                    features, uni_features = compute_quaternary_features(file_path)
-                    quaternary_data.append(features)
-                    universal_data.append(uni_features)
+                features, uni_features = compute_ternary_features(file_path_str)
+                ternary_data.append(features)
+                universal_data.append(uni_features)
+                matched = True
+            except Exception:
+                pass
+
+            if matched:
+                continue
+
+            try:
+                features, uni_features = compute_quaternary_features(file_path_str)
+                quaternary_data.append(features)
+                universal_data.append(uni_features)
             except Exception:
                 continue
 
