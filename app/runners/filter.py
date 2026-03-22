@@ -14,6 +14,20 @@ from app.filter_util import (
 )
 
 
+def _normalize_structure_column(df):
+    aliases = ["Structure", "Structure type", "Structure_type"]
+    lower_map = {str(col).strip().lower(): col for col in df.columns}
+    for alias in aliases:
+        key = alias.lower()
+        if key not in lower_map:
+            continue
+        original = lower_map[key]
+        if original != "Structure":
+            df = df.rename(columns={original: "Structure"})
+        return df
+    return df
+
+
 def run_filter_option(script_path):
     """Filtering function coded by Emil Jaffal."""
     prompt.sort_formulas_in_excel_or_folder(
@@ -55,7 +69,7 @@ def run_filter_option(script_path):
     elements = data.get_element_list()
 
     # Define a DataFrame with invalid formulas
-    invalid_formulas = pd.read_excel(excel_file_path)
+    invalid_formulas = _normalize_structure_column(pd.read_excel(excel_file_path))
 
     # Apply the function to each row in the DataFrame
     parsed_data = (

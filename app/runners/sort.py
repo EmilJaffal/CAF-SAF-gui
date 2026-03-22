@@ -10,6 +10,20 @@ from bobleesj.utils.sources.oliynyk import Property as P
 from app.util import folder, prompt
 
 
+def _normalize_structure_column(df):
+    aliases = ["Structure", "Structure type", "Structure_type"]
+    lower_map = {str(col).strip().lower(): col for col in df.columns}
+    for alias in aliases:
+        key = alias.lower()
+        if key not in lower_map:
+            continue
+        original = lower_map[key]
+        if original != "Structure":
+            df = df.rename(columns={original: "Structure"})
+        return df
+    return df
+
+
 def run_sort_option(script_dir_path):
     sort_method = prompt.choose_sort_method()
     if sort_method in [1, 2, 3, 4]:
@@ -20,7 +34,7 @@ def run_sort_option(script_dir_path):
             print(f"You've selected: {formula_excel_path}")
     dir_path, base_name = os.path.split(formula_excel_path)
     excel_filename = os.path.splitext(base_name)[0]
-    df = pd.read_excel(formula_excel_path)
+    df = _normalize_structure_column(pd.read_excel(formula_excel_path))
     # Read the Formula or formula column into a list of formulas
     formulas = _extract_formulas(df)
     if sort_method == 1:

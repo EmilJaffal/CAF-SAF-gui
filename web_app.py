@@ -32,10 +32,6 @@ from app.runners import feature, filter, match, merge, sort
 
 BASE_DIR = Path(__file__).resolve().parent
 JOBS_DIR = BASE_DIR / "web_jobs"
-STRUCTURE_APP_MAIN = (
-    BASE_DIR.parent / "structure-analyzer-featurizer-app" / "main.py"
-)
-STRUCTURE_APP_ROOT = STRUCTURE_APP_MAIN.parent
 PERFORMANCE_APP_ROOT = BASE_DIR  # Local core/ directory for option 8
 
 app = Flask(__name__)
@@ -904,20 +900,51 @@ def _find_cif_dirs(job_dir: Path):
 
 
 def _load_saf_main_module():
-    if not STRUCTURE_APP_MAIN.exists():
+    configured_path = os.environ.get("STRUCTURE_APP_MAIN", "").strip()
+
+    candidates = []
+    if configured_path:
+        candidates.append(Path(configured_path))
+
+    candidates.extend(
+        [
+            BASE_DIR.parent / "structure-analyzer-featurizer-app" / "main.py",
+            BASE_DIR / "structure-analyzer-featurizer-app" / "main.py",
+        ]
+    )
+
+    for parent in BASE_DIR.parents:
+        candidates.append(parent / "structure-analyzer-featurizer-app" / "main.py")
+
+    seen = set()
+    unique_candidates = []
+    for candidate in candidates:
+        resolved = candidate.resolve(strict=False)
+        key = str(resolved)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_candidates.append(candidate)
+
+    structure_app_main = next((p for p in unique_candidates if p.exists()), None)
+    if structure_app_main is None:
+        searched = "\n- " + "\n- ".join(str(p) for p in unique_candidates)
         raise FileNotFoundError(
-            f"Could not find SAF app at {STRUCTURE_APP_MAIN}. "
-            "Ensure both repositories are opened as siblings."
+            "Could not find SAF app main.py in any expected location. "
+            "Set STRUCTURE_APP_MAIN or keep structure-analyzer-featurizer-app as a sibling. "
+            f"Searched:{searched}"
         )
 
+    structure_app_root = structure_app_main.parent
+
     # SAF main imports modules like `core` relative to its own repository.
-    saf_root = str(STRUCTURE_APP_ROOT)
+    saf_root = str(structure_app_root)
     inserted_path = False
     if saf_root not in sys.path:
         sys.path.insert(0, saf_root)
         inserted_path = True
 
-    spec = importlib.util.spec_from_file_location("saf_main", STRUCTURE_APP_MAIN)
+    spec = importlib.util.spec_from_file_location("saf_main", structure_app_main)
     if spec is None or spec.loader is None:
         raise ImportError("Could not load SAF main module")
     module = importlib.util.module_from_spec(spec)
@@ -929,13 +956,87 @@ def _load_saf_main_module():
             sys.path.pop(0)
 
 
-def _run_saf_option(job_dir: Path):
-    saf_main = _load_saf_main_module()
+def _run_saf_with_installed_packages(job_dir: Path):
+    try:
+        from cifkit import Cif
+        from cifkit.utils.folder import get_file_paths
+        from pandas import DataFrame
+        from SAF.features.generator import (
+            compute_binary_features,
+            compute_quaternary_features,
+            compute_ternary_features,
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            "SAF fallback runner requires installed packages: cifkit and "
+            "composition-analyzer-featurizer (SAF module)."
+        ) from exc
+
     cif_dirs = _find_cif_dirs(job_dir)
     if not cif_dirs:
         raise RuntimeError("No .cif files found. Upload a ZIP containing CIF files.")
+
     for cif_dir in cif_dirs:
-        saf_main.process_cifs(str(cif_dir))
+        file_paths = get_file_paths(str(cif_dir))
+        binary_data = []
+        ternary_data = []
+        quaternary_data = []
+        universal_data = []
+
+        for file_path in file_paths:
+            try:
+                cif = Cif(file_path)
+            except Exception:
+                continue
+
+            try:
+                if len(cif.unique_elements) == 2:
+                    features, uni_features = compute_binary_features(file_path)
+                    binary_data.append(features)
+                    universal_data.append(uni_features)
+                elif len(cif.unique_elements) == 3:
+                    features, uni_features = compute_ternary_features(file_path)
+                    ternary_data.append(features)
+                    universal_data.append(uni_features)
+                elif len(cif.unique_elements) == 4:
+                    features, uni_features = compute_quaternary_features(file_path)
+                    quaternary_data.append(features)
+                    universal_data.append(uni_features)
+            except Exception:
+                continue
+
+        csv_folder_path = cif_dir / "csv"
+        csv_folder_path.mkdir(parents=True, exist_ok=True)
+
+        if binary_data:
+            DataFrame(binary_data).round(3).to_csv(
+                csv_folder_path / "binary_features.csv", index=False
+            )
+        if ternary_data:
+            DataFrame(ternary_data).round(3).to_csv(
+                csv_folder_path / "ternary_features.csv", index=False
+            )
+        if quaternary_data:
+            DataFrame(quaternary_data).round(3).to_csv(
+                csv_folder_path / "quaternary_features.csv", index=False
+            )
+        if universal_data:
+            DataFrame(universal_data).round(3).to_csv(
+                csv_folder_path / "universal_features.csv", index=False
+            )
+
+
+def _run_saf_option(job_dir: Path):
+    cif_dirs = _find_cif_dirs(job_dir)
+    if not cif_dirs:
+        raise RuntimeError("No .cif files found. Upload a ZIP containing CIF files.")
+
+    try:
+        saf_main = _load_saf_main_module()
+        for cif_dir in cif_dirs:
+            saf_main.process_cifs(str(cif_dir))
+    except FileNotFoundError:
+        _run_saf_with_installed_packages(job_dir)
 
 
 def _default_answers_for_option(option: int):

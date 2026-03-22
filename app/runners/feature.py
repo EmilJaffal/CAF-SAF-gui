@@ -17,10 +17,23 @@ def _get_column_case_insensitive(df, target_name):
     return next((c for c in df.columns if c.lower() == target_name.lower()), None)
 
 
+def _normalize_structure_column(df):
+    aliases = ["Structure", "Structure type", "Structure_type"]
+    for alias in aliases:
+        col = _get_column_case_insensitive(df, alias)
+        if not col:
+            continue
+        if col != "Structure":
+            df = df.rename(columns={col: "Structure"})
+        return df
+    return df
+
+
 def _append_entry_to_feature_files(
     save_dir,
     file_prefix,
     entry_by_formula,
+    structure_by_formula,
     add_extended_features,
 ):
     feature_sets = ["binary", "ternary", "quaternary", "universal"]
@@ -37,14 +50,33 @@ def _append_entry_to_feature_files(
         if not formula_col:
             continue
 
-        entry_values = feature_df[formula_col].map(entry_by_formula)
-        existing_entry_col = _get_column_case_insensitive(feature_df, "Entry")
+        formula_series = feature_df[formula_col].astype(str).str.strip()
+        formula_idx = feature_df.columns.get_loc(formula_col)
 
-        if existing_entry_col:
-            feature_df[existing_entry_col] = entry_values
-        else:
-            formula_idx = feature_df.columns.get_loc(formula_col)
-            feature_df.insert(formula_idx, "Entry", entry_values)
+        if entry_by_formula:
+            entry_values = formula_series.map(entry_by_formula)
+            existing_entry_col = _get_column_case_insensitive(feature_df, "Entry")
+            if existing_entry_col:
+                feature_df[existing_entry_col] = entry_values
+            else:
+                feature_df.insert(formula_idx, "Entry", entry_values)
+                formula_idx += 1
+
+        if structure_by_formula:
+            structure_values = formula_series.map(structure_by_formula)
+            existing_structure_col = _get_column_case_insensitive(
+                feature_df, "Structure"
+            )
+            if existing_structure_col and existing_structure_col != "Structure":
+                feature_df = feature_df.rename(
+                    columns={existing_structure_col: "Structure"}
+                )
+                existing_structure_col = "Structure"
+
+            if existing_structure_col:
+                feature_df[existing_structure_col] = structure_values
+            else:
+                feature_df.insert(formula_idx, "Structure", structure_values)
 
         feature_df.to_csv(csv_path, index=False)
 
@@ -61,7 +93,7 @@ def run_feature_option(script_dir_path):
     # list Excel files containing with "formula" columns
     _, base_name = os.path.split(formula_excel_path)
     base_name_no_ext = os.path.splitext(base_name)[0]
-    df = pd.read_excel(formula_excel_path)
+    df = _normalize_structure_column(pd.read_excel(formula_excel_path))
     col = _get_column_case_insensitive(df, "Formula")
     if not col:
         print("No formula column found. Exiting.")
@@ -69,7 +101,9 @@ def run_feature_option(script_dir_path):
 
     formulas = df[col]
     entry_col = _get_column_case_insensitive(df, "Entry")
+    structure_col = _get_column_case_insensitive(df, "Structure")
     entry_by_formula = {}
+    structure_by_formula = {}
     if entry_col:
         entry_map_df = df[[col, entry_col]].dropna(subset=[col, entry_col]).copy()
         entry_map_df[col] = entry_map_df[col].astype(str).str.strip()
@@ -77,6 +111,22 @@ def run_feature_option(script_dir_path):
         entry_map_df = entry_map_df[entry_map_df[entry_col] != ""]
         entry_map_df = entry_map_df.drop_duplicates(subset=[col], keep="first")
         entry_by_formula = dict(zip(entry_map_df[col], entry_map_df[entry_col]))
+
+    if structure_col:
+        structure_map_df = df[[col, structure_col]].dropna(
+            subset=[col, structure_col]
+        ).copy()
+        structure_map_df[col] = structure_map_df[col].astype(str).str.strip()
+        structure_map_df[structure_col] = (
+            structure_map_df[structure_col].astype(str).str.strip()
+        )
+        structure_map_df = structure_map_df[structure_map_df[structure_col] != ""]
+        structure_map_df = structure_map_df.drop_duplicates(
+            subset=[col], keep="first"
+        )
+        structure_by_formula = dict(
+            zip(structure_map_df[col], structure_map_df[structure_col])
+        )
 
     # User select whether to add normalized compositional one-hot encoding
     # is_encoding_added = click.confirm(
@@ -108,14 +158,15 @@ def run_feature_option(script_dir_path):
         file_prefix=base_name_no_ext,
     )
 
-    if entry_by_formula:
+    if entry_by_formula or structure_by_formula:
         _append_entry_to_feature_files(
             save_dir=os.path.dirname(formula_excel_path),
             file_prefix=base_name_no_ext,
             entry_by_formula=entry_by_formula,
+            structure_by_formula=structure_by_formula,
             add_extended_features=add_extended_features,
         )
         click.secho(
-            "Entry column appended to generated feature CSV files.",
+            "Entry/Structure columns appended to generated feature CSV files.",
             fg="cyan",
         )
