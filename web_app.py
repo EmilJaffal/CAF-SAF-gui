@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
 import zipfile
@@ -983,6 +984,26 @@ def _run_saf_with_installed_packages(job_dir: Path):
             + "\n- ".join(import_errors)
         )
 
+    def _run_with_timeout(func, file_path, timeout_sec=10):
+        """Run function with timeout using threading."""
+        result = {"data": None, "error": None}
+
+        def worker():
+            try:
+                result["data"] = func(file_path)
+            except Exception as exc:
+                result["error"] = exc
+
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+        thread.join(timeout=timeout_sec)
+
+        if thread.is_alive():
+            return None  # Timeout occurred
+        if result["error"]:
+            raise result["error"]
+        return result["data"]
+
     try:
         from pandas import DataFrame
         (
@@ -1002,6 +1023,9 @@ def _run_saf_with_installed_packages(job_dir: Path):
 
     for cif_dir in cif_dirs:
         file_paths = sorted(cif_dir.rglob("*.cif"))
+        # Limit to first 10 CIF files to avoid Heroku 30s router timeout
+        file_paths = file_paths[:10]
+        
         binary_data = []
         ternary_data = []
         quaternary_data = []
@@ -1010,32 +1034,42 @@ def _run_saf_with_installed_packages(job_dir: Path):
         for file_path in file_paths:
             file_path_str = str(file_path)
             matched = False
+            
+            # Try binary with 10s timeout
             try:
-                features, uni_features = compute_binary_features(file_path_str)
-                binary_data.append(features)
-                universal_data.append(uni_features)
-                matched = True
+                result = _run_with_timeout(compute_binary_features, file_path_str, timeout_sec=10)
+                if result is not None:
+                    features, uni_features = result
+                    binary_data.append(features)
+                    universal_data.append(uni_features)
+                    matched = True
             except Exception:
                 pass
 
             if matched:
                 continue
 
+            # Try ternary with 10s timeout
             try:
-                features, uni_features = compute_ternary_features(file_path_str)
-                ternary_data.append(features)
-                universal_data.append(uni_features)
-                matched = True
+                result = _run_with_timeout(compute_ternary_features, file_path_str, timeout_sec=10)
+                if result is not None:
+                    features, uni_features = result
+                    ternary_data.append(features)
+                    universal_data.append(uni_features)
+                    matched = True
             except Exception:
                 pass
 
             if matched:
                 continue
 
+            # Try quaternary with 10s timeout
             try:
-                features, uni_features = compute_quaternary_features(file_path_str)
-                quaternary_data.append(features)
-                universal_data.append(uni_features)
+                result = _run_with_timeout(compute_quaternary_features, file_path_str, timeout_sec=10)
+                if result is not None:
+                    features, uni_features = result
+                    quaternary_data.append(features)
+                    universal_data.append(uni_features)
             except Exception:
                 continue
 
