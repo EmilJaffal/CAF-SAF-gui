@@ -36,7 +36,7 @@ STRUCTURE_APP_MAIN = (
     BASE_DIR.parent / "structure-analyzer-featurizer-app" / "main.py"
 )
 STRUCTURE_APP_ROOT = STRUCTURE_APP_MAIN.parent
-PERFORMANCE_APP_ROOT = BASE_DIR.parent / "SAF-CAF-performance-main"
+PERFORMANCE_APP_ROOT = BASE_DIR  # Local core/ directory for option 8
 
 app = Flask(__name__)
 
@@ -553,10 +553,11 @@ def _prepare_option8_feature_dataframe(df: pd.DataFrame):
 
 
 def _run_option8_performance(job_dir: Path):
-    if not PERFORMANCE_APP_ROOT.exists():
+    core_dir = PERFORMANCE_APP_ROOT / "core"
+    if not core_dir.exists():
         raise FileNotFoundError(
-            f"Could not find performance app at {PERFORMANCE_APP_ROOT}. "
-            "Ensure SAF-CAF-performance-main exists as a sibling repository."
+            f"Could not find performance core modules at {core_dir}. "
+            "Ensure the core/ directory exists in the CAF-SAF-gui repository."
         )
 
     input_csv = _find_option8_input_csv(job_dir)
