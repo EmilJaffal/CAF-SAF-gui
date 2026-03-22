@@ -28,6 +28,8 @@ def parse_entry_formula(folder_path):
                 # Get the formula from the CIF file
                 formula = parser.get_formula_from_cif(file_path)
                 entry = parser.get_cif_entry_id(file_path)
+                if not entry:
+                    entry = os.path.splitext(file)[0]
                 structure = parser.get_cif_structure(file_path)
                 entries.append(entry)
                 formulas.append(formula)

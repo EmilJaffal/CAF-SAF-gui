@@ -56,6 +56,12 @@ def sort_formulas_in_excel_or_folder(script_dir, available_files):
         if 1 <= choice <= len(cif_folders):
             cif_dir_path = os.path.join(script_dir, cif_folders[choice - 1])
             df = parse_entry_formula(cif_dir_path)
+            if "Entry" not in df.columns:
+                df.insert(0, "Entry", "")
+            if "Formula" in df.columns:
+                formula_idx = df.columns.get_loc("Formula")
+                entry_series = df.pop("Entry")
+                df.insert(formula_idx, "Entry", entry_series)
             df.index = df.index + 1
             click.secho("Data processed from CIF folder:", fg="cyan")
             print(df.head(5))

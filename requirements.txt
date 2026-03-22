@@ -4,3 +4,6 @@ pandas
 matplotlib
 bobleesj.utils
 composition-analyzer-featurizer
+flask
+scikit-learn
+xgboost

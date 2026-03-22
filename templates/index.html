@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CAF + SAF Web Runner</title>
+    <style>
+      :root {
+        --ink: #0e1e2a;
+        --paper: #f4efe7;
+        --card: #fff8ef;
+        --accent: #d66a1f;
+        --accent-2: #1f6a8a;
+        --line: #d9c7b5;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 15% 20%, #ffd2a8 0%, transparent 35%),
+          radial-gradient(circle at 85% 25%, #bbe4f0 0%, transparent 32%),
+          linear-gradient(145deg, #f7f1e6 0%, #f0eadf 100%);
+        min-height: 100vh;
+      }
+
+      .wrap {
+        max-width: 980px;
+        margin: 32px auto;
+        padding: 24px;
+      }
+
+      .hero {
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: clamp(1.5rem, 4vw, 2.4rem);
+        letter-spacing: 0.02em;
+      }
+
+      p {
+        line-height: 1.5;
+      }
+
+      .panel {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 8px 26px rgba(16, 35, 48, 0.08);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      @media (min-width: 860px) {
+        .grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+
+      select,
+      textarea,
+      input[type="file"] {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        background: #fff;
+        color: var(--ink);
+      }
+
+      textarea {
+        min-height: 180px;
+        resize: vertical;
+        font-family: "Menlo", "Consolas", monospace;
+        font-size: 0.92rem;
+      }
+
+      .full {
+        grid-column: 1 / -1;
+      }
+
+      button {
+        border: 0;
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        color: #fff;
+        background: linear-gradient(135deg, var(--accent), #e18f34);
+        transition: transform 0.15s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      .hint {
+        margin-top: 8px;
+        font-size: 0.9rem;
+        color: #2f4e61;
+      }
+
+      .code {
+        padding: 10px;
+        border: 1px dashed var(--line);
+        border-radius: 10px;
+        background: #fff;
+        font-family: "Menlo", "Consolas", monospace;
+        white-space: pre-wrap;
+      }
+
+      .option-panel {
+        display: none;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+      }
+
+      .option-panel.active {
+        display: block;
+      }
+
+      .option-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      @media (min-width: 860px) {
+        .option-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      .inline {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .default {
+        font-size: 0.85rem;
+        color: #335267;
+      }
+
+      input[type="number"] {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+      }
+
+      .help {
+        margin-top: 6px;
+        font-size: 0.84rem;
+        color: #3c5f73;
+        line-height: 1.45;
+      }
+
+      .context {
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px solid #d7e5ec;
+        border-radius: 10px;
+        background: #f7fcff;
+        font-size: 0.86rem;
+        color: #2b4f63;
+      }
+
+      .status {
+        display: none;
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid #bfd9e6;
+        background: #eef9ff;
+        color: #18445a;
+        font-size: 0.92rem;
+        line-height: 1.45;
+      }
+
+      .status.error {
+        border-color: #e4b5b5;
+        background: #fff1f1;
+        color: #6f1d1d;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="hero">
+        <h1>Unified CAF + SAF Web GUI</h1>
+        <p>
+          Upload a .zip with CIF folders and/or optional Excel/CSV files, choose an
+          option, then download all generated outputs as a .zip.
+        </p>
+        <div id="run-status" class="status"></div>
+      </div>
+
+      <form class="panel" action="/run" method="post" enctype="multipart/form-data">
+        <div class="grid">
+          <div>
+            <label for="option">Option</label>
+            <select id="option" name="option">
+              <option value="1" selected>1 - CAF: Filter formulas + periodic table heatmap</option>
+              <option value="2">2 - CAF: Sort formulas in Excel</option>
+              <option value="3">3 - CAF: Create compositional features</option>
+              <option value="4">4 - CAF: Match CIF folder against Excel</option>
+              <option value="5">5 - CAF: Merge two Excel/CSV files by Entry</option>
+              <option value="6">6 - SAF: Create structural features from CIFs</option>
+              <option value="7">7 - Automatic CAF + SAF (1 -> 2 -> 3 -> 6 + merge)</option>
+              <option value="8">8 - SAF-CAF Performance: Run clustering + model analysis</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="cif_zip">CIF .zip Upload</label>
+            <input id="cif_zip" name="cif_zip" type="file" accept=".zip" />
+            <div class="hint">For options 1, 6, and 7, .zip should contain .cif files.</div>
+          </div>
+
+          <div class="full">
+            <label for="extra_files">Extra Excel/CSV files (optional)</label>
+            <input
+              id="extra_files"
+              name="extra_files"
+              type="file"
+              multiple
+              accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+            />
+            <div class="hint">Use this for .xlsx/.xls/.csv files required by options 1-5 and 8. (can use a .zip for option 1)</div>
+          </div>
+
+          <div class="full">
+            <label>Option-Specific Controls</label>
+            <div class="hint">These controls replace manual prompt answers and show default values explicitly.</div>
+            <div class="context">
+              About all "index" fields: index means selection number from a sorted list.
+              1 = first item, 2 = second item, etc. If you only uploaded one matching file/folder/sheet,
+              keep it as 1.
+            </div>
+          </div>
+
+          <div class="full option-panel" id="panel-1">
+            <div class="option-grid">
+              <div>
+                <label for="opt1_source_mode">Source Mode</label>
+                <select id="opt1_source_mode">
+                  <option value="2" selected>Use already filtered sheet</option>
+                  <option value="1">Process raw Excel/CIF input</option>
+                </select>
+                <div class="default">Default: 2</div>
+              </div>
+              <div>
+                <label for="opt1_target_index">Raw Input Selection Number (mode 1 only)</label>
+                <input id="opt1_target_index" type="number" min="1" value="1" />
+                <div class="default">Default: 1</div>
+                <div class="help">Only used in Process raw mode. This is the first list selection (CIF folder or Excel file) before summary.</div>
+              </div>
+              <div>
+                <label for="opt1_summary_index">Summary File Selection Number</label>
+                <input id="opt1_summary_index" type="number" min="1" value="1" />
+                <div class="default">Default: 1</div>
+                <div class="help">This maps to: "Which file would you like to summarize". Usually 1 for the generated *_elements_sorted.xlsx file.</div>
+              </div>
+              <div>
+                <label for="opt1_extra_filter">Apply Extra Numerical/Elemental Filtering</label>
+                <select id="opt1_extra_filter">
+                  <option value="n" selected>No</option>
+                  <option value="y">Yes</option>
+                </select>
+                <div class="default">Default: No</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="full option-panel" id="panel-2">
+            <div class="option-grid">
+              <div>
+                <label for="opt2_sort_method">Sort Method</label>
+                <select id="opt2_sort_method">
+                  <option value="1" selected>1 - Custom label</option>
+                  <option value="2">2 - Stoichiometry</option>
+                  <option value="3">3 - Property</option>
+                </select>
+                <div class="default">Default: 1</div>
+                <div class="help">
+                  Custom label: uses predefined element order mapping in the project.<br />
+                  Stoichiometry: sorts by elemental ratios (can use ascending/normalize toggles).<br />
+                  Property: sorts by a selected elemental property (uses property selection index).
+                </div>
+              </div>
+              <div>
+                <label for="opt2_file_index">Excel File Selection Number</label>
+                <input id="opt2_file_index" type="number" min="1" value="1" />
+                <div class="default">Default: 1</div>
+                <div class="help">Pick which uploaded Excel file to sort. 1 means the first available file in sorted order.</div>
+              </div>
+              <div>
+                <label for="opt2_property_index">Property Selection Number (method 3 only)</label>
+                <input id="opt2_property_index" type="number" min="1" value="1" />
+                <div class="default">Default: 1</div>
+                <div class="help">Only used when Sort Method = Property. It picks the property from the underlying CAF property menu; keep 1 unless you intentionally use another property position.</div>
+              </div>
+              <div class="inline">
+                <label><input id="opt2_ascending" type="checkbox" checked /> Ascending</label>
+                <span class="default">Default: Yes</span>
+              </div>
+              <div class="inline">
+                <label><input id="opt2_normalize" type="checkbox" /> Normalize</label>
+                <span class="default">Default: No</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="full option-panel" id="panel-3">
+            <div class="option-grid">
+              <div>
+                <label for="opt3_file_index">Excel File Selection Number</label>
+                <input id="opt3_file_index" type="number" min="1" value="1" />
+                <div class="default">Default: 1</div>
+                <div class="help">Which uploaded Excel file to featurize. 1 is usually correct when there is one candidate.</div>
+              </div>
+              <div class="inline">
+                <label><input id="opt3_extended" type="checkbox" /> Include Extended Features</label>
+                <span class="default">Default: No</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="full option-panel" id="panel-4">
+            <div class="option-grid">
+              <div>
+                <label for="opt4_cif_folder">CIF Folder Selection Number</label>
+                <input id="opt4_cif_folder" type="number" min="1" value="1" />
+                <div class="default">Default: 1</div>
+                <div class="help">Which CIF folder to use for matching. 1 means first folder found in sorted order.</div>
+              </div>
+              <div>
+                <label for="opt4_excel_file">Excel File Selection Number</label>
+                <input id="opt4_excel_file" type="number" min="1" value="1" />
+                <div class="default">Default: 1</div>
+                <div class="help">Which Excel file to match against CIF IDs.</div>
+              </div>
+              <div>
+                <label for="opt4_sheet_index">Sheet Selection Number</label>
+                <input id="opt4_sheet_index" type="number" min="1" value="1" />
+                <div class="default">Default: 1</div>
+                <div class="help">Which sheet inside the selected Excel workbook. 1 = first sheet tab.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="full option-panel" id="panel-5">
+            <div class="option-grid">
+              <div>
+                <label for="opt5_file1">Featurized File Selection Number</label>
+                <input id="opt5_file1" type="number" min="1" value="1" />
+                <div class="default">Default: 1</div>
+                <div class="help">First file in merge flow: your featurized dataset (has Entry and feature columns).</div>
+              </div>
+              <div>
+                <label for="opt5_sheet1">Featurized Sheet Selection Number</label>
+                <input id="opt5_sheet1" type="number" min="1" value="1" />
+                <div class="default">Default: 1</div>
+                <div class="help">Sheet to use from the featurized workbook. 1 means first sheet.</div>
+              </div>
+              <div>
+                <label for="opt5_file2">Database File Selection Number</label>
+                <input id="opt5_file2" type="number" min="1" value="2" />
+                <div class="default">Default: 2</div>
+                <div class="help">Second file in merge flow: your database/reference dataset with Entry column.</div>
+              </div>
+              <div>
+                <label for="opt5_sheet2">Database Sheet Selection Number</label>
+                <input id="opt5_sheet2" type="number" min="1" value="1" />
+                <div class="default">Default: 1</div>
+                <div class="help">Sheet to use from the database workbook. 1 means first sheet.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="full option-panel" id="panel-6">
+            <div class="hint">No prompt choices are needed for option 6. Upload a CIF .zip and run.</div>
+          </div>
+
+          <div class="full option-panel" id="panel-7">
+            <div class="hint">
+              Option 7 is fully automatic and uses defaults for every stage.<br />
+              Flow: CAF option 1 -> 2 -> 3, then SAF option 6, then an option-4-style match/merge between CAF(3) and SAF(6).<br />
+              Requirement: upload a .zip that contains .cif files.
+            </div>
+          </div>
+
+          <div class="full option-panel" id="panel-8">
+            <div class="hint">
+              Option 8 runs SAF-CAF feature-performance analysis (SVM, PLS-DA clustering plot, XGBoost).<br />
+              Upload one feature CSV in Extra files that includes a structure label column such as Structure (Standard) or
+              Structure type.<br />
+              If your CSV comes from option 7 outputs, use the file ending with `_merged` or `_matched`.
+            </div>
+          </div>
+
+          <input id="prompt_answers" name="prompt_answers" type="hidden" value="" />
+
+          <div class="full">
+            <button type="submit">Run and Download Outputs</button>
+          </div>
+        </div>
+      </form>
+    </div>
+    <script>
+      (function () {
+        const optionSelect = document.getElementById("option");
+        const promptHidden = document.getElementById("prompt_answers");
+        const form = document.querySelector("form.panel");
+        const runStatus = document.getElementById("run-status");
+
+        function showStatus(message, isError) {
+          runStatus.textContent = message;
+          runStatus.style.display = "block";
+          runStatus.classList.toggle("error", Boolean(isError));
+        }
+
+        function parseDownloadFileName(contentDisposition) {
+          if (!contentDisposition) return "outputs.zip";
+          const match = contentDisposition.match(/filename="?([^";]+)"?/i);
+          return match && match[1] ? match[1] : "outputs.zip";
+        }
+
+        function triggerDownload(blob, fileName) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+        }
+
+        function yn(value) {
+          return value ? "y" : "n";
+        }
+
+        function setActivePanel(option) {
+          for (let i = 1; i <= 8; i += 1) {
+            const panel = document.getElementById(`panel-${i}`);
+            if (!panel) continue;
+            panel.classList.toggle("active", String(i) === String(option));
+          }
+        }
+
+        function buildPromptAnswers(option) {
+          if (option === "1") {
+            const sourceMode = document.getElementById("opt1_source_mode").value;
+            const answers = [sourceMode];
+
+            // When source mode is raw (1), the CLI asks for an additional
+            // selection of CIF folder / Excel source before summary selection.
+            if (sourceMode === "1") {
+              answers.push(document.getElementById("opt1_target_index").value);
+            }
+
+            answers.push(document.getElementById("opt1_summary_index").value);
+            answers.push(document.getElementById("opt1_extra_filter").value);
+            return answers.join("\n");
+          }
+
+          if (option === "2") {
+            const method = document.getElementById("opt2_sort_method").value;
+            const answers = [method, document.getElementById("opt2_file_index").value];
+            if (method === "2") {
+              answers.push(yn(document.getElementById("opt2_ascending").checked));
+              answers.push(yn(document.getElementById("opt2_normalize").checked));
+            }
+            if (method === "3") {
+              answers.push(document.getElementById("opt2_property_index").value);
+              answers.push(yn(document.getElementById("opt2_ascending").checked));
+              answers.push(yn(document.getElementById("opt2_normalize").checked));
+            }
+            return answers.join("\n");
+          }
+
+          if (option === "3") {
+            return [
+              document.getElementById("opt3_file_index").value,
+              yn(document.getElementById("opt3_extended").checked),
+            ].join("\n");
+          }
+
+          if (option === "4") {
+            return [
+              document.getElementById("opt4_cif_folder").value,
+              document.getElementById("opt4_excel_file").value,
+              document.getElementById("opt4_sheet_index").value,
+            ].join("\n");
+          }
+
+          if (option === "5") {
+            return [
+              document.getElementById("opt5_file1").value,
+              document.getElementById("opt5_sheet1").value,
+              document.getElementById("opt5_file2").value,
+              document.getElementById("opt5_sheet2").value,
+            ].join("\n");
+          }
+
+          return "";
+        }
+
+        optionSelect.addEventListener("change", function () {
+          setActivePanel(optionSelect.value);
+        });
+
+        form.addEventListener("submit", async function (event) {
+          event.preventDefault();
+          promptHidden.value = buildPromptAnswers(optionSelect.value);
+
+          showStatus("Running selected option...", false);
+
+          const formData = new FormData(form);
+          let response;
+
+          try {
+            response = await fetch(form.action, {
+              method: "POST",
+              body: formData,
+            });
+          } catch (networkError) {
+            showStatus(
+              "Run failed: could not reach the server. Please retry.",
+              true,
+            );
+            return;
+          }
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            showStatus(errorText || "Run failed with an unknown error.", true);
+            return;
+          }
+
+          const runMessage = response.headers.get("X-Run-Message");
+          const contentDisposition = response.headers.get("Content-Disposition");
+          const fileName = parseDownloadFileName(contentDisposition);
+          const blob = await response.blob();
+          triggerDownload(blob, fileName);
+
+          showStatus(
+            runMessage || "Run completed successfully. Output ZIP downloaded.",
+            false,
+          );
+        });
+
+        setActivePanel(optionSelect.value);
+      })();
+    </script>
+  </body>
+</html>
