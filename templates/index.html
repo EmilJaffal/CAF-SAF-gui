@@ -292,6 +292,10 @@
                 <div class="default">Default: No</div>
               </div>
             </div>
+            <div class="hint">
+              <strong>Structure Column:</strong> If your input has a "Structure" column (or aliases like "Structure type"), 
+              it will match formulas to Entry and display both in output files.
+            </div>
           </div>
 
           <div class="full option-panel" id="panel-2">
@@ -331,6 +335,10 @@
                 <span class="default">Default: No</span>
               </div>
             </div>
+            <div class="hint">
+              <strong>Structure Column:</strong> If your input has a "Structure" column (or aliases like "Structure type"), 
+              it will be preserved in sorted output files.
+            </div>
           </div>
 
           <div class="full option-panel" id="panel-3">
@@ -345,6 +353,10 @@
                 <label><input id="opt3_extended" type="checkbox" /> Include Extended Features</label>
                 <span class="default">Default: No</span>
               </div>
+            </div>
+            <div class="hint">
+              <strong>Structure Column:</strong> If your Excel file has a "Structure" column (or aliases like "Structure type"), 
+              it will be preserved in all generated feature CSVs. Columns must use valid Excel column names.
             </div>
           </div>
 
@@ -401,7 +413,11 @@
           </div>
 
           <div class="full option-panel" id="panel-6">
-            <div class="hint">No prompt choices are needed for option 6. Upload a CIF .zip and run.</div>
+            <div class="hint">
+              No prompt choices are needed for option 6. Upload a CIF .zip and run.<br/>
+              <strong>⚠️ CIF Limit:</strong> Web version processes max ~10 CIF files due to Heroku's 30-second timeout. 
+              For batches with more CIFs, <a href="https://github.com/EmilJaffal/CAF-SAF-gui" target="_blank">install locally</a>.
+            </div>
           </div>
 
           <div class="full option-panel" id="panel-7">
