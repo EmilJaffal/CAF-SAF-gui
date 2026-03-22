@@ -5,7 +5,6 @@ import importlib.util
 import importlib
 import os
 import shutil
-import signal
 import subprocess
 import sys
 import tempfile
@@ -983,26 +982,6 @@ def _run_saf_with_installed_packages(job_dir: Path):
             "Tried modules:\n- "
             + "\n- ".join(import_errors)
         )
-    
-    class TimeoutError(Exception):
-        """Custom timeout exception."""
-        pass
-
-    @contextlib.contextmanager
-    def timeout_context(seconds):
-        """Context manager to timeout code block."""
-        def timeout_handler(signum, frame):
-            raise TimeoutError(f"Operation timed out after {seconds} seconds")
-        
-        # Set the signal handler and alarm
-        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(seconds)
-        try:
-            yield
-        finally:
-            # Disable the alarm
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
 
     try:
         from pandas import DataFrame
@@ -1032,35 +1011,32 @@ def _run_saf_with_installed_packages(job_dir: Path):
             file_path_str = str(file_path)
             matched = False
             try:
-                with timeout_context(15):  # 15 seconds per file
-                    features, uni_features = compute_binary_features(file_path_str)
-                    binary_data.append(features)
-                    universal_data.append(uni_features)
-                    matched = True
-            except (TimeoutError, Exception):
+                features, uni_features = compute_binary_features(file_path_str)
+                binary_data.append(features)
+                universal_data.append(uni_features)
+                matched = True
+            except Exception:
                 pass
 
             if matched:
                 continue
 
             try:
-                with timeout_context(15):  # 15 seconds per file
-                    features, uni_features = compute_ternary_features(file_path_str)
-                    ternary_data.append(features)
-                    universal_data.append(uni_features)
-                    matched = True
-            except (TimeoutError, Exception):
+                features, uni_features = compute_ternary_features(file_path_str)
+                ternary_data.append(features)
+                universal_data.append(uni_features)
+                matched = True
+            except Exception:
                 pass
 
             if matched:
                 continue
 
             try:
-                with timeout_context(15):  # 15 seconds per file
-                    features, uni_features = compute_quaternary_features(file_path_str)
-                    quaternary_data.append(features)
-                    universal_data.append(uni_features)
-            except (TimeoutError, Exception):
+                features, uni_features = compute_quaternary_features(file_path_str)
+                quaternary_data.append(features)
+                universal_data.append(uni_features)
+            except Exception:
                 continue
 
         csv_folder_path = cif_dir / "csv"
