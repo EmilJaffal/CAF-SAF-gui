@@ -993,7 +993,7 @@ def _run_saf_with_installed_packages(job_dir: Path):
     except Exception as exc:
         raise RuntimeError(
             "SAF fallback runner could not initialize from installed "
-            "composition-analyzer-featurizer package."
+            "structure-analyzer-featurizer package."
         ) from exc
 
     cif_dirs = _find_cif_dirs(job_dir)
