@@ -299,15 +299,17 @@
               <div>
                 <label for="opt2_sort_method">Sort Method</label>
                 <select id="opt2_sort_method">
-                  <option value="1" selected>1 - Custom label</option>
+                  <option value="1">1 - Custom label</option>
                   <option value="2">2 - Stoichiometry</option>
                   <option value="3">3 - Property</option>
+                  <option value="4" selected>4 - Mendeleev number</option>
                 </select>
-                <div class="default">Default: 1</div>
+                <div class="default">Default: 4</div>
                 <div class="help">
                   Custom label: uses predefined element order mapping in the project.<br />
                   Stoichiometry: sorts by elemental ratios (can use ascending/normalize toggles).<br />
-                  Property: sorts by a selected elemental property (uses property selection index).
+                  Property: sorts by a selected elemental property (uses property selection index).<br />
+                  Mendeleev number: sorts elements by Mendeleev number before features are generated.
                 </div>
               </div>
               <div>
@@ -496,6 +498,10 @@
             }
             if (method === "3") {
               answers.push(document.getElementById("opt2_property_index").value);
+              answers.push(yn(document.getElementById("opt2_ascending").checked));
+              answers.push(yn(document.getElementById("opt2_normalize").checked));
+            }
+            if (method === "4") {
               answers.push(yn(document.getElementById("opt2_ascending").checked));
               answers.push(yn(document.getElementById("opt2_normalize").checked));
             }

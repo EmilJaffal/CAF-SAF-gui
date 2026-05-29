@@ -13,7 +13,7 @@ def choose_sort_method():
         "Custom label - Reorder by the pre-configured label for each element.",
         "Stoichiometry - Reorder by the ratio of each element in the formula.",
         "Property - Reorder by elemental chemical property value.",
-        "Parse formulas into elements and indices without sorting.",
+        "Mendeleev number - Reorder by Mendeleev number before features are generated.",
     ]
 
     click.echo("\nSorting methods available:")
@@ -24,6 +24,8 @@ def choose_sort_method():
         "Choose one of the sorting methods above by entering the "
         "corresponding number",
         type=int,
+        default=4,
+        show_default=True,
     )
     return sort_method
 

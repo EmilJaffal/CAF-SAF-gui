@@ -271,8 +271,9 @@ def _build_auto_option2_answers(job_dir: Path):
     )
     file_index = xlsx_files.index(preferred) + 1
 
-    # Method 1 (custom label) and selected file index.
-    return f"1\n{file_index}", preferred
+    # Method 3 (Property) and select Mendeleev (property index 5), with
+    # ascending=yes and normalize=no for automation.
+    return f"3\n{file_index}\n5\ny\nn", preferred
 
 
 def _build_auto_option3_answers(job_dir: Path):
@@ -282,10 +283,23 @@ def _build_auto_option3_answers(job_dir: Path):
             "Option 7 could not find an Excel file with a Formula column after option 2."
         )
 
-    preferred = _choose_preferred_xlsx_file(
-        xlsx_files,
-        preferred_suffixes=["_by_custom_label.xlsx"],
-    )
+    preferred = None
+    preferred_tokens = [
+        "_by_mendeleev_number",
+        "_by_custom_label",
+        "_by_stoichiometry",
+        "_by_property_",
+    ]
+    lowered = [f.lower() for f in xlsx_files]
+    for token in preferred_tokens:
+        for idx, name in enumerate(lowered):
+            if token in name:
+                preferred = xlsx_files[idx]
+                break
+        if preferred:
+            break
+    if preferred is None:
+        preferred = xlsx_files[0]
     file_index = xlsx_files.index(preferred) + 1
 
     # Select file, and keep extended features at default (No).
@@ -326,7 +340,7 @@ def _pick_option6_saf_csvs(job_dir: Path, changed_option6: list[str]):
             continue
         candidates.append(job_dir / rel_path)
 
-    # Option 7 should merge ternary CAF output with ternary SAF output.
+    # Option 7 should merge the CAF option 3 output with the SAF option 6 output.
     ternary = [p for p in candidates if "ternary" in p.name.lower()]
     if ternary:
         return sorted(ternary, key=lambda p: str(p).lower())
@@ -338,17 +352,58 @@ def _find_common_merge_column(left_df: pd.DataFrame, right_df: pd.DataFrame):
     left_cols = {str(col).lower(): str(col) for col in left_df.columns}
     right_cols = {str(col).lower(): str(col) for col in right_df.columns}
 
-    preferred_keys = ["entry", "cif_id", "id"]
+    preferred_keys = ["entry", "formula", "cif_id", "id"]
 
-    for key in preferred_keys:
-        if key in left_cols and key in right_cols:
-            return left_cols[key], right_cols[key], key
+    left_candidates = [left_cols[key] for key in preferred_keys if key in left_cols]
+    right_candidates = [right_cols[key] for key in preferred_keys if key in right_cols]
 
-    return None, None, None
+    best_match = None
+    for left_key in left_candidates:
+        left_values = set(_normalize_merge_key_series(left_df[left_key]))
+        left_values.discard("")
+        if not left_values:
+            continue
+
+        for right_key in right_candidates:
+            right_values = set(_normalize_merge_key_series(right_df[right_key]))
+            right_values.discard("")
+            if not right_values:
+                continue
+
+            overlap_count = len(left_values.intersection(right_values))
+            if overlap_count == 0:
+                continue
+
+            left_rank = preferred_keys.index(left_key.lower())
+            right_rank = preferred_keys.index(right_key.lower())
+            candidate_rank = (
+                overlap_count,
+                -(left_rank + right_rank),
+                left_key.lower() == right_key.lower(),
+            )
+
+            if best_match is None or candidate_rank > best_match[0]:
+                merge_key_name = (
+                    left_key
+                    if left_key.lower() == right_key.lower()
+                    else f"{left_key} <-> {right_key}"
+                )
+                best_match = (
+                    candidate_rank,
+                    left_key,
+                    right_key,
+                    merge_key_name,
+                )
+
+    if best_match is None:
+        return None, None, None
+
+    _, left_key, right_key, merge_key_name = best_match
+    return left_key, right_key, merge_key_name
 
 
 def _normalize_merge_key_series(series: pd.Series):
-    normalized = series.astype(str).str.strip()
+    normalized = series.fillna("").astype(str).str.strip()
     normalized = normalized.str.replace(r"\.0+$", "", regex=True)
 
     # SAF/CAF IDs can appear as raw numbers, floats, or filenames like 12345.cif.
@@ -413,7 +468,7 @@ def _merge_option3_and_option6_like_option4(
 
     if matched_caf.empty:
         raise RuntimeError(
-            "Option 7 found no overlapping Entry IDs between CAF ternary and SAF ternary outputs."
+            "Option 7 found no overlapping identifiers between CAF and SAF outputs."
         )
 
     merged = matched_caf.merge(
@@ -943,7 +998,7 @@ def _default_answers_for_option(option: int):
     if option == 1:
         return "2\n1\nn"
     if option == 2:
-        return "1\n1"
+        return "4\n1\ny\nn"
     if option == 3:
         return "1\nn"
     if option == 4:
@@ -1109,7 +1164,7 @@ def run_job():
                 "Proceed to option 3 and use this file.\n\n"
             )
             run_message = (
-                f"Option 2 complete: sorted file generated ({sorted_file_name}). "
+                f"Option 2 complete: Mendeleev-sorted file generated ({sorted_file_name}). "
                 "Proceed to option 3 and use this file."
             )
         if option == 3:
