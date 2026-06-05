@@ -9,12 +9,12 @@ from sklearn.svm import SVC
 from core import folder, preprocess
 
 
-def get_report(X, y):
+def get_report(X, y, n_splits=10):
     # Define the model
     model = SVC(kernel="rbf")
 
     # StratifiedKFold to ensure balanced folds
-    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=41)
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=41)
 
     # Use cross_val_predict to get predictions for each fold
     y_pred = cross_val_predict(model, X, y, cv=skf)

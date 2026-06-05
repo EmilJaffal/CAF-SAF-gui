@@ -15,14 +15,14 @@ from sklearn.preprocessing import LabelEncoder
 from core import folder
 
 
-def find_best_n_dim(X, y, csv_file_path, MAX_N_COMPONENTS=10):
+def find_best_n_dim(X, y, csv_file_path, MAX_N_COMPONENTS=10, n_splits=10):
     best_accuracy = 0
     best_n_components = 2
 
     # Initialize a DataFrame to store the results
     results = []
 
-    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=19)
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=19)
 
     for n in range(2, MAX_N_COMPONENTS + 1):
         pls = PLSRegression(n_components=n)
@@ -100,13 +100,13 @@ def save_correlation_matrix(X, X_columns, csv_file_path):
     df.to_csv(output_path)
 
 
-def generate_classification_report(X_scaled, y, pls):
+def generate_classification_report(X_scaled, y, pls, n_splits=10):
     # Import necessary modules
     encoder = LabelEncoder()
     y_encoded = encoder.fit_transform(y)
 
     # Set up 10-fold cross-validation
-    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=19)
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=19)
 
     # Suppress specific warnings during cross-validation
     with warnings.catch_warnings():

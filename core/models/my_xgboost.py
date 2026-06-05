@@ -8,13 +8,13 @@ from xgboost import XGBClassifier
 from core import folder
 
 
-def run_XGBoost(X_df, y):
+def run_XGBoost(X_df, y, n_splits=10):
     # Initialize the Label Encoder and encode the labels
     encoder = LabelEncoder()
     y_encoded = encoder.fit_transform(y)
 
     # Initialize Stratified K-Fold cross-validator
-    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=19)
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=19)
 
     # Initialize the XGBoost Classifier
     model = XGBClassifier(eval_metric="mlogloss")

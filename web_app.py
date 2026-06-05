@@ -633,13 +633,42 @@ def _run_option8_performance(job_dir: Path):
             "Structure type, Structure_caf, Structure_saf)."
         )
 
-    labels = df[structure_col].astype(str).str.strip()
-    if labels.empty:
-        raise RuntimeError("Option 8 structure label column has no usable values.")
-    if (labels == "").any():
+    labels = df[structure_col].astype("string").str.strip()
+    valid_mask = labels.notna() & (labels != "") & (labels.str.lower() != "nan")
+    removed_rows = int((~valid_mask).sum())
+    if valid_mask.sum() == 0:
         raise RuntimeError(
-            "Option 8 structure label column contains blank values. "
-            "Please fill or remove blank-labeled rows."
+            "Option 8 structure label column has no usable values after "
+            "removing blanks and missing labels."
+        )
+
+    if removed_rows:
+        print(
+            f"Option 8: dropped {removed_rows} row(s) with missing structure labels."
+        )
+
+    df = df.loc[valid_mask].reset_index(drop=True)
+    labels = labels.loc[valid_mask].reset_index(drop=True)
+
+    label_counts = labels.value_counts()
+    singleton_labels = sorted(label_counts[label_counts == 1].index.tolist())
+    if singleton_labels:
+        singleton_mask = labels.isin(singleton_labels)
+        skipped_rows = int(singleton_mask.sum())
+        print(
+            "Option 8: skipped singleton structure class(es): "
+            + ", ".join(singleton_labels)
+        )
+        print(
+            f"Option 8: removed {skipped_rows} row(s) belonging to singleton class(es)."
+        )
+        df = df.loc[~singleton_mask].reset_index(drop=True)
+        labels = labels.loc[~singleton_mask].reset_index(drop=True)
+
+    if labels.nunique() < 2:
+        raise RuntimeError(
+            "Option 8 needs at least two structure classes with at least two "
+            "rows each after filtering blanks and singleton classes."
         )
 
     feature_df = _prepare_option8_feature_dataframe(df)
@@ -647,6 +676,12 @@ def _run_option8_performance(job_dir: Path):
         raise RuntimeError(
             "Option 8 could not find numeric feature columns after removing "
             "identifier/string columns."
+        )
+
+    max_splits = min(10, int(labels.value_counts().min()))
+    if max_splits < 2:
+        raise RuntimeError(
+            "Option 8 needs at least two rows in every remaining structure class."
         )
 
     perf_root = job_dir / "option8_performance_workspace"
@@ -674,22 +709,23 @@ def _run_option8_performance(job_dir: Path):
             "if len(y) != len(pd.read_csv(csv_file_path)):\n    raise RuntimeError('Option 8 expects one structure label per input row.')",
             "encoder = LabelEncoder()",
             "y_encoded = encoder.fit_transform(y)",
+            f"cv_splits = {max_splits}",
             "start_time = time.perf_counter()",
             "X_df, X, columns = preprocess.prepare_standarlize_X_block_(csv_file_path)",
             "print(f'Processing {csv_file_path} with {X.shape[1]} features.')",
             "print('(1/4) Running SVM model...')",
-            "svm_report = SVM.get_report(X, y)",
+            "svm_report = SVM.get_report(X, y, n_splits=cv_splits)",
             "report.record_model_performance(svm_report, 'SVM', csv_file_path)",
             "print('(2/4) Running PLS_DA n=2...')",
             "PLS_DA_plot.plot_two_component(X, y, csv_file_path)",
             "print('(3/4) Running PLS_DA model with the best n...')",
-            "best_n_components = PLS_DA.find_best_n_dim(X, y_encoded, csv_file_path)",
+            "best_n_components = PLS_DA.find_best_n_dim(X, y_encoded, csv_file_path, n_splits=cv_splits)",
             "best_pls = PLSRegression(n_components=best_n_components)",
-            "pls_report = PLS_DA.generate_classification_report(X, y, best_pls)",
+            "pls_report = PLS_DA.generate_classification_report(X, y, best_pls, n_splits=cv_splits)",
             "report.record_model_performance(pls_report, 'PLS_DA', csv_file_path)",
             "PLS_DA.save_feature_importance(X, columns, y_encoded, best_pls, best_n_components, csv_file_path)",
             "print('(4/4) Running XGBoost model...')",
-            "xgb_report = my_xgboost.run_XGBoost(X_df, y)",
+            "xgb_report = my_xgboost.run_XGBoost(X_df, y, n_splits=cv_splits)",
             "report.record_model_performance(xgb_report, 'XGBoost', csv_file_path)",
             "my_xgboost.plot_XGBoost_feature_importance(X_df, y_encoded, csv_file_path)",
             "elapsed_time = time.perf_counter() - start_time",
@@ -857,6 +893,17 @@ def _zip_saf_outputs(job_dir: Path, before_snapshot: dict, run_log_text: str):
     export_pairs = []
     used_targets = set()
 
+    def _derive_saf_output_folder_name(rel_path: Path):
+        if "csv" in rel_path.parts:
+            csv_idx = rel_path.parts.index("csv")
+            if csv_idx > 0:
+                return rel_path.parts[csv_idx - 1]
+
+        if len(rel_path.parts) > 1:
+            return rel_path.parts[0]
+
+        return rel_path.stem or "input"
+
     for rel_path_str, meta in after_snapshot.items():
         if rel_path_str in before_snapshot and before_snapshot[rel_path_str] == meta:
             continue
@@ -866,14 +913,8 @@ def _zip_saf_outputs(job_dir: Path, before_snapshot: dict, run_log_text: str):
             continue
         if rel_path.suffix.lower() != ".csv":
             continue
-        if "csv" not in rel_path.parts:
-            continue
 
-        csv_idx = rel_path.parts.index("csv")
-        if csv_idx == 0:
-            continue
-
-        source_folder_name = rel_path.parts[csv_idx - 1]
+        source_folder_name = _derive_saf_output_folder_name(rel_path)
         output_folder = f"6_SAF_{source_folder_name}_output"
         base_target = Path(output_folder) / f"structural_{rel_path.name}"
         target = base_target

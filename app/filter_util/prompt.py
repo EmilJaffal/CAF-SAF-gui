@@ -7,16 +7,29 @@ from app.filter_util.parser import parse_formula1
 from app.filter_util.processor import parse_entry_formula
 
 
+def _contains_cif_files(directory_path):
+    for _, _, files in os.walk(directory_path):
+        for file in files:
+            if file.lower().endswith(".cif"):
+                return True
+    return False
+
+
 def sort_formulas_in_excel_or_folder(script_dir, available_files):
     available_folders = [
         folder
         for folder in available_files
         if os.path.isdir(os.path.join(script_dir, folder))
-        and any(
-            file.endswith(".cif")
-            for file in os.listdir(os.path.join(script_dir, folder))
-        )
+        and _contains_cif_files(os.path.join(script_dir, folder))
     ]
+
+    # Some ZIP uploads place CIF files directly in the job root.
+    if any(
+        os.path.isfile(os.path.join(script_dir, f))
+        and f.lower().endswith(".cif")
+        for f in available_files
+    ):
+        available_folders.insert(0, ".")
 
     excel_sheets = [f for f in available_files if f.endswith(".xlsx")]
     cif_folders = [
@@ -43,7 +56,8 @@ def sort_formulas_in_excel_or_folder(script_dir, available_files):
     if choice == 1:
         click.secho("Available folders containing .cif files:", fg="cyan")
         for idx, folder in enumerate(cif_folders, start=1):
-            click.echo(f"{idx}. {folder}")
+            label = "(current directory)" if folder == "." else folder
+            click.echo(f"{idx}. {label}")
         excel_sheets.sort()  # Sort the list alphabetically
         click.secho("Available .xlsx files:", fg="cyan")
         for idx, sheet in enumerate(excel_sheets, start=len(cif_folders) + 1):
@@ -54,7 +68,11 @@ def sort_formulas_in_excel_or_folder(script_dir, available_files):
         )
 
         if 1 <= choice <= len(cif_folders):
-            cif_dir_path = os.path.join(script_dir, cif_folders[choice - 1])
+            selected_folder = cif_folders[choice - 1]
+            if selected_folder == ".":
+                cif_dir_path = script_dir
+            else:
+                cif_dir_path = os.path.join(script_dir, selected_folder)
             df = parse_entry_formula(cif_dir_path)
             if "Entry" not in df.columns:
                 df.insert(0, "Entry", "")
