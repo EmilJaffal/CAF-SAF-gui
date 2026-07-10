@@ -2,10 +2,10 @@ import os
 
 import click
 import pandas as pd
-from bobleesj.utils.parsers.formula import Formula
-from bobleesj.utils.sorters.element_sorter import ElementSorter
-from bobleesj.utils.sources.oliynyk import Oliynyk
-from bobleesj.utils.sources.oliynyk import Property as P
+from cifkit.parsers.formula import Formula
+from cifkit.sorters.element_sorter import ElementSorter
+from cifkit.sources.oliynyk import Oliynyk
+from cifkit.sources.oliynyk import Property as P
 
 from app.util import folder, prompt
 

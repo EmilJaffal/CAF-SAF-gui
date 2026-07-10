@@ -2,7 +2,7 @@ numpy
 click
 pandas
 matplotlib
-bobleesj.utils
+cifkit>=1.2.1
 composition-analyzer-featurizer
 flask
 gunicorn
